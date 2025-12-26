@@ -1,6 +1,6 @@
 # pytest-forger
 
-![](images/pytest-forger.jpg)
+![](https://raw.githubusercontent.com/DaryllLorenzo/pytest-forger/main/images/pytest-forger.jpg)
 
 > Version: 0.1.0 
 > Status: **First functional release with CLI**
@@ -12,8 +12,6 @@
 pytest-forger is a Python tool designed to forge PyTest-ready tests from existing Python source code.
 
 The goal of the project is to reduce the friction and boilerplate involved in writing tests by automatically generating test scaffolding and mocks based on the structure of your code, while keeping the developer fully in control of the final behavior.
-
-This initial release (**v0.0.1**) exists primarily to reserve the project name and clearly define the vision and scope of the project.
 
 ---
 
@@ -90,21 +88,7 @@ These features are planned, not yet implemented:
   - Imported functions
 - Minimal factory generation based on return type hints
 - PyTest-compatible test scaffolding
-- CLI interface for test generation
 - Configurable mock policies
-- Optional integrations with LLMs for test suggestions (future)
-
----
-
-## Current Status
-
-Version 0.0.1
-- Placeholder release
-- Name reservation on PyPI
-- No functional implementation yet
-- API and architecture subject to change
-
-Development will begin after this initial release.
 
 ---
 
