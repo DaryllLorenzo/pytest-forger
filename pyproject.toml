@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pytest-forger"
-version = "0.1.0"
+version = "0.1.1"
 description = "Automatic test scaffolding and mock generation for Python"
 readme = "README.md"
 license = "MIT"
