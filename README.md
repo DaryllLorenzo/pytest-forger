@@ -2,8 +2,8 @@
 
 ![](images/pytest-forger.jpg)
 
-> Version: 0.0.1  
-> Status: Early placeholder release (name reservation on PyPI)
+> Version: 0.1.0 
+> Status: **First functional release with CLI**
 
 ---
 
