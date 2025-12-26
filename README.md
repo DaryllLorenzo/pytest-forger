@@ -108,13 +108,34 @@ Development will begin after this initial release.
 
 ---
 
-## Roadmap (High-Level)
+## Changelog
 
-- 0.1.x — Core static analysis and test scaffolding
-- 0.2.x — Mock generation and configuration
-- 0.3.x — Factories and improved type handling
-- 0.4.x+ — Advanced features and integrations
+### [0.1.0] - 2025-12-26
+#### Added
+- Initial CLI implementation using Typer framework
+- `ptf version` command to display project version and information
+- `ptf forge <source_file.py>` command interface for test generation
+- Complete argument parsing system with options:
+  - `--function` / `-f` - Target specific function for test generation
+  - `--output` / `-o` - Custom output directory for generated tests
+  - `--overwrite` / `-w` - Overwrite existing test files
+  - `--verbose` / `-v` - Enable detailed output for debugging
+- Project structure with `src/` layout
+- PyPI-ready packaging configuration in `pyproject.toml`
+- Dependencies: `pytest>=7.4.0`, `typer>=0.9.0`
 
+#### Notes
+- `ptf forge` currently provides the interface without actual code analysis
+- This release establishes the foundation for implementing test generation
+- Installation via `pip install -e .` for development
+
+---
+
+### 🔧 Coming in v0.2.0
+- Actual Python source code analysis
+- Test skeleton generation from functions
+- Basic test file creation with proper imports
+- Support for simple function signatures
 ---
 
 ## Philosophy
