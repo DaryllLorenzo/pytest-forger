@@ -1,5 +1,7 @@
 # pytest-forger
 
+![](images/pytest-forger.jpg)
+
 > Version: 0.0.1  
 > Status: Early placeholder release (name reservation on PyPI)
 
