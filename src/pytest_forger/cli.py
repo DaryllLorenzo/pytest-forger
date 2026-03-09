@@ -98,6 +98,7 @@ def forge(
     try:
         analyzer = CodeAnalyzer(src_path)
         functions = analyzer.extract_functions()
+        external_deps = analyzer.get_external_dependencies()
     except Exception as e:
         typer.secho(f"Error parsing file: {e}", fg=typer.colors.RED)
         raise typer.Exit(code=1)
@@ -110,6 +111,8 @@ def forge(
 
     if verbose:
         typer.echo(f"Found {len(functions)} functions/methods to test.")
+        if external_deps:
+            typer.echo(f"Detected {len(external_deps)} external dependencies.")
 
     # 3. Output Directory Preparation
     default_out = Path("tests")
@@ -129,7 +132,7 @@ def forge(
         typer.secho(f"Warning: File '{test_file_path}' already exists. Use --overwrite to replace it.", fg=typer.colors.YELLOW)
         raise typer.Exit(code=0)
 
-    test_content = generate_test_content(src_path, functions)
+    test_content = generate_test_content(src_path, functions, external_deps)
 
     try:
         with open(test_file_path, "w", encoding="utf-8") as f:
