@@ -1,0 +1,4 @@
+# Ignore generated test files
+test_*.py
+!test_core.py
+!test_cli.py
