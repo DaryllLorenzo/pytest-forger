@@ -1,86 +1,207 @@
 import ast
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Any, Optional
+
 
 class CodeAnalyzer:
+    """Analyzes Python source code to extract functions, classes, and dependencies."""
+
     def __init__(self, source_path: Path):
         self.source_path = source_path
         self.tree = self._parse_file()
+        self.imports: List[Dict[str, Any]] = []
+        self._extract_imports()
 
     def _parse_file(self) -> ast.AST:
         """Reads and parses the source file."""
         with open(self.source_path, "r", encoding="utf-8") as f:
             return ast.parse(f.read())
 
-    def extract_functions(self) -> List[Dict]:
-        """Extracts global functions and class methods."""
-        functions = []
-        
+    def _extract_imports(self) -> None:
+        """Extract all import statements from the source file."""
         for node in ast.walk(self.tree):
-            # Extract global functions
-            if isinstance(node, ast.FunctionDef):
-                # Ignore private/magic methods by default
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    self.imports.append({
+                        "type": "import",
+                        "module": alias.name,
+                        "alias": alias.asname,
+                    })
+            elif isinstance(node, ast.ImportFrom):
+                for alias in node.names:
+                    self.imports.append({
+                        "type": "from",
+                        "module": node.module or "",
+                        "name": alias.name,
+                        "alias": alias.asname,
+                    })
+
+    def extract_functions(self) -> List[Dict[str, Any]]:
+        """Extract global functions and class methods with their context."""
+        functions: List[Dict[str, Any]] = []
+
+        for node in self.tree.body:
+            # Extract global functions (including async)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 if node.name.startswith("__"):
                     continue
-                
-                # Filter out 'self' for class methods
-                args = [arg.arg for arg in node.args.args if arg.arg != 'self']
-                
-                functions.append({
-                    "name": node.name,
-                    "args": args,
-                    "docstring": ast.get_docstring(node)
-                })
-                
+                functions.append(self._extract_function_info(node))
+
+            # Extract class methods
+            elif isinstance(node, ast.ClassDef):
+                for item in node.body:
+                    if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        # Exclude dunder and private/protected methods
+                        if item.name.startswith("__") or item.name.startswith("_"):
+                            continue
+                        func_info = self._extract_function_info(item)
+                        func_info["class_name"] = node.name
+                        functions.append(func_info)
+
         return functions
 
-def generate_test_content(source_file: Path, functions: List[Dict]) -> str:
+    def _extract_function_info(
+        self, node: ast.FunctionDef | ast.AsyncFunctionDef
+    ) -> Dict[str, Any]:
+        """Extract detailed information from a function/method node."""
+        args = []
+        for arg in node.args.args:
+            if arg.arg not in ("self", "cls"):
+                arg_info = {"name": arg.arg}
+                if arg.annotation:
+                    arg_info["type_hint"] = ast.unparse(arg.annotation)
+                args.append(arg_info)
+
+        return_type = None
+        if node.returns:
+            return_type = ast.unparse(node.returns)
+
+        return {
+            "name": node.name,
+            "args": args,
+            "is_async": isinstance(node, ast.AsyncFunctionDef),
+            "return_type": return_type,
+            "docstring": ast.get_docstring(node),
+        }
+
+    def get_external_dependencies(self) -> List[Dict[str, Any]]:
+        """
+        Identify external dependencies (non-standard library imports).
+        Returns imports that are likely third-party or local modules.
+        """
+        stdlib_modules = {
+            "abc", "argparse", "ast", "asyncio", "base64", "collections",
+            "contextlib", "copy", "csv", "dataclasses", "datetime", "decimal",
+            "enum", "functools", "hashlib", "http", "io", "itertools", "json",
+            "logging", "math", "multiprocessing", "operator", "os", "pathlib",
+            "pickle", "random", "re", "shutil", "socket", "sqlite3", "string",
+            "subprocess", "sys", "tempfile", "threading", "time", "typing",
+            "unittest", "urllib", "uuid", "warnings", "xml", "zipfile",
+        }
+
+        external = []
+        for imp in self.imports:
+            module = imp.get("module", "")
+            base_module = module.split(".")[0]
+            if base_module and base_module not in stdlib_modules:
+                external.append(imp)
+        return external
+
+
+def generate_test_content(
+    source_file: Path,
+    functions: List[Dict[str, Any]],
+    external_deps: Optional[List[Dict[str, Any]]] = None,
+) -> str:
     """Generates the text content for the test file."""
     module_name = source_file.stem
-    
-    # Test file header
-    # Uses explicit import to avoid namespace pollution and conflicts
+
     content = [
         "import pytest",
-        f"import {module_name} # Fix route to the import if needed", 
+        f"from {module_name} import *",
+        "from unittest.mock import MagicMock, patch",
         "",
         "# Tests generated by pytest-forger",
-        ""
+        "",
     ]
+
+    # Add mock setup section for external dependencies
+    if external_deps:
+        content.append("# Mock setup for external dependencies")
+        content.append("# Uncomment and customize based on your needs")
+        for dep in external_deps:
+            if dep["type"] == "from":
+                content.append(
+                    f"# {dep['name']} = MagicMock()  # from {dep['module']}"
+                )
+            else:
+                content.append(f"# {dep['module']} = MagicMock()")
+        content.append("")
 
     if not functions:
         content.append(f"# No public functions found in {source_file.name}")
         content.append("def test_placeholder():")
         content.append("    assert True")
+        return "\n".join(content)
 
     for func in functions:
-        func_name = func['name']
+        func_name = func["name"]
+        class_name = func.get("class_name")
         test_name = f"test_{func_name}"
-        
-        # Prepare arguments initialization
-        args_list = func['args']
-        args_init = [f"{arg} = None" for arg in args_list]
+        is_async = func.get("is_async", False)
+
+        args_list = [arg["name"] for arg in func["args"]]
         args_call = ", ".join(args_list)
 
-        content.append(f"def {test_name}():")
-        
-        # Add docstring if available
-        if func['docstring']:
-            summary = func['docstring'].splitlines()[0]
-            content.append(f'    """Test for {func_name}: {summary}"""')
-        
-        content.append("    # Arrange")
-        if args_init:
-            content.append(f"    {'; '.join(args_init)}  # TODO: Assign real values")
+        # Build function signature for test
+        if class_name:
+            content.append(f"def test_{class_name}_{func_name}():")
         else:
+            content.append(f"def {test_name}():")
+
+        # Add docstring if available
+        if func["docstring"]:
+            summary = func["docstring"].splitlines()[0]
+            content.append(f'    """Test for {func_name}: {summary}"""')
+
+        content.append("    # Arrange")
+
+        # If it's a method, instantiate the class
+        if class_name:
+            content.append(f"    instance = {module_name}.{class_name}()")
+
+        # Initialize arguments with type-aware placeholders
+        for arg in func["args"]:
+            arg_name = arg["name"]
+            type_hint = arg.get("type_hint")
+            if type_hint:
+                if type_hint == "str":
+                    content.append(f'    {arg_name} = "TODO: provide value"')
+                elif type_hint in ("int", "float"):
+                    content.append(f"    {arg_name} = 0")
+                elif type_hint == "bool":
+                    content.append(f"    {arg_name} = False")
+                elif type_hint in ("list", "List", "dict", "Dict", "set", "Set", "tuple", "Tuple"):
+                    content.append(f"    {arg_name} = {type_hint}()")
+                else:
+                    content.append(f"    {arg_name} = None  # type: {type_hint}")
+            else:
+                content.append(f"    {arg_name} = None  # TODO: provide value")
+
+        if not args_list and not class_name:
             content.append("    # (No arguments required)")
-        
+
         content.append("    # Act")
-        # Explicit call: module.function()
-        content.append(f"    # result = {module_name}.{func_name}({args_call})")
-        
+        if class_name:
+            content.append(f"    # result = instance.{func_name}({args_call})")
+        elif is_async:
+            content.append(f"    # result = await {module_name}.{func_name}({args_call})")
+            content.append("    # Note: Use pytest-asyncio for async tests")
+        else:
+            content.append(f"    # result = {module_name}.{func_name}({args_call})")
+
         content.append("    # Assert")
-        content.append("    assert True  # TODO: Replace with: assert result == expected_value")
+        content.append("    assert True  # TODO: Replace with actual assertion")
         content.append("")
 
     return "\n".join(content)
